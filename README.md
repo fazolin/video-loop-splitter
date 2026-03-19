@@ -298,6 +298,8 @@ ffmpeg -version
 ffprobe -version
 ```
 
+**Note:** If FFmpeg commands still fail after installation, the tool will automatically use hardcoded paths to the installed FFmpeg executables. This resolves PATH issues in different terminal sessions.
+
 **macOS**
 ```bash
 brew install ffmpeg
