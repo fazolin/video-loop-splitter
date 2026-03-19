@@ -71,13 +71,37 @@ video-loop-splitter --input ./videos --output ./loops
 node index.js --input ./videos --output ./loops
 ```
 
+### Multiple Inputs
+
+You can specify multiple files and directories:
+
+```bash
+# Single file (creates loops folder next to the file)
+node index.js --input video.mp4
+
+# Multiple files
+node index.js --input video1.mp4 --input video2.mp4
+
+# Mix of files and directories
+node index.js --input video.mp4 --input ./videos --input another.mp4
+
+# Interactive mode (enter paths one by one, blank line to finish)
+node index.js
+```
+
 ### All Options
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--input <dir>` | *(required)* | Input directory containing video files |
-| `--output <dir>` | `./loops` | Output directory for processed videos |
+| `--input <path>` | *(required)* | Input file or directory (can be used multiple times) |
+| `--output <dir>` | `./loops` | Output directory (ignored for individual files) |
 | `--split <ratio>` | `0.5` | Split ratio between 0.2 (20%) and 0.8 (80%) |
+| `--workers <num>` | `2` | Number of parallel worker threads |
+| `--dry-run` | `false` | Preview operations without processing |
+| `--overwrite` | `false` | Overwrite existing output files |
+| `--no-recursive` | `false` | Don't scan subdirectories |
+| `--help`, `-h` | — | Show help message |
+| `--version`, `-v` | — | Show version number |
 | `--workers <num>` | `2` | Number of parallel worker threads |
 | `--dry-run` | `false` | Preview operations without processing |
 | `--overwrite` | `false` | Overwrite existing output files |
@@ -90,6 +114,11 @@ node index.js --input ./videos --output ./loops
 **Basic processing (default 50% split, 2 workers):**
 ```bash
 node index.js --input ./videos --output ./loops
+```
+
+**Process multiple files:**
+```bash
+node index.js --input video1.mp4 --input video2.mp4 --input ./batch1
 ```
 
 **Custom split point and more workers:**
@@ -222,6 +251,9 @@ Video files are processed with the suffix `_loop`:
 - `video.mp4` → `video_loop.mp4`
 - `intro.mov` → `intro_loop.mov`
 - `nature.webm` → `nature_loop.webm`
+
+**For individual files:** Output goes to a `loops` folder next to the input file.
+**For directories:** Output goes to the specified `--output` directory (or `loops` inside the input directory).
 
 Output directory structure mirrors the input structure (with `--no-recursive` disabled).
 
