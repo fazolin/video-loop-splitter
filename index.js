@@ -145,7 +145,19 @@ async function promptForMultipleInputs() {
         console.error('❌ At least one input path is required');
         continue;
       }
+      // User is done entering paths
+      console.log(''); // blank line for clarity
       break;
+    }
+
+    // Skip if user accidentally pasted output text or prompts
+    if (pathInput.includes('Enter input paths') || 
+        pathInput.includes('video-loop-splitter') || 
+        pathInput.includes('Advanced options') ||
+        pathInput.includes('Split ratio')) {
+      console.error('⚠️  It looks like you pasted terminal output. Please paste only file/folder paths.');
+      console.error('   (You can paste multiple paths separated by spaces or on separate lines)\n');
+      continue;
     }
 
     // Parse multiple paths if user pasted them at once
@@ -155,10 +167,13 @@ async function promptForMultipleInputs() {
       console.error('\n❌ No valid paths detected.');
       console.error('   Make sure paths start with a drive letter (C:, D:, E:, etc.) or / (Unix/Mac)');
       console.error('   If using "Paste as One Line", check that the FIRST path has the drive letter.');
-      console.error('   Input received: ' + pathInput.substring(0, 120) + (pathInput.length > 120 ? '...' : ''));
+      console.error('   Input received: ' + pathInput.substring(0, 80) + (pathInput.length > 80 ? '...' : ''));
       console.error('');
       continue;
     }
+
+    let addedCount = 0;
+    let skippedCount = 0;
 
     for (const singlePath of pathsToProcess) {
       // Remove surrounding quotes if present (handles: "path", 'path', or path)
@@ -173,7 +188,8 @@ async function promptForMultipleInputs() {
       const fullPath = path.resolve(trimmedPath);
 
       if (!fs.existsSync(fullPath)) {
-        console.error(`❌ Path does not exist: ${fullPath}`);
+        console.error(`   ❌ Path does not exist: ${fullPath}`);
+        skippedCount++;
         continue;
       }
 
@@ -181,19 +197,30 @@ async function promptForMultipleInputs() {
       if (stat.isFile()) {
         const ext = path.extname(fullPath).toLowerCase();
         if (!SUPPORTED_EXTENSIONS.includes(ext)) {
-          console.error(`❌ Unsupported file type: ${ext}`);
+          console.error(`   ❌ Unsupported file type: ${ext} (${fullPath})`);
+          skippedCount++;
           continue;
         }
         inputs.push({ type: 'file', path: fullPath });
-        console.log(`✅ Added: ${fullPath}`);
+        console.log(`   ✅ Added file: ${path.basename(fullPath)}`);
+        addedCount++;
       } else if (stat.isDirectory()) {
         inputs.push({ type: 'dir', path: fullPath });
-        console.log(`✅ Added: ${fullPath}`);
+        console.log(`   ✅ Added folder: ${path.basename(fullPath)}`);
+        addedCount++;
       } else {
-        console.error(`❌ Path is neither a file nor a directory: ${fullPath}`);
+        console.error(`   ❌ Path is neither a file nor a directory: ${fullPath}`);
+        skippedCount++;
         continue;
       }
     }
+
+    if (addedCount === 0 && skippedCount > 0) {
+      console.error(`   → None of the paths were valid. Try again.\n`);
+      continue;
+    }
+
+    console.log('');
   }
 
   return inputs;
