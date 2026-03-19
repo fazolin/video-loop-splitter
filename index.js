@@ -16,13 +16,16 @@ const SUPPORTED_EXTENSIONS = ['.mp4', '.mov', '.mkv', '.avi', '.webm'];
  * @returns {string[]} - Array of individual paths
  */
 function parsePastedPaths(input) {
+  // Clean up input: remove newlines and extra whitespace that can occur from copy-paste
+  let cleanInput = input.replace(/[\r\n]+/g, '').trim();
+  
   // First, try to split by quoted paths (most common from Windows Explorer)
   // Pattern: "C:\path\to\file" or "D:\path with spaces"
   const quotedPattern = /"([^"]+)"/g;
   const quotedMatches = [];
   let match;
   
-  while ((match = quotedPattern.exec(input)) !== null) {
+  while ((match = quotedPattern.exec(cleanInput)) !== null) {
     let cleanPath = match[1].trim();
     
     // Skip empty paths
@@ -57,19 +60,19 @@ function parsePastedPaths(input) {
   // Look for Windows drive letters (C:, D:, etc.)
   const drivePattern = /[A-Za-z]:/g;
   
-  while ((match = drivePattern.exec(input)) !== null) {
+  while ((match = drivePattern.exec(cleanInput)) !== null) {
     pathStarts.push(match.index);
   }
   
   // Look for Unix absolute paths (starting with /)
   const unixPattern = /(?:^|\s)\/[^\s]/g;
-  while ((match = unixPattern.exec(input)) !== null) {
+  while ((match = unixPattern.exec(cleanInput)) !== null) {
     pathStarts.push(match.index + (match[0].startsWith('/') ? 0 : 1));
   }
   
   // If no multiple paths found, return as single path (if valid)
   if (pathStarts.length <= 1) {
-    const trimmed = input.trim().replace(/^["']+|["']+$/g, '');
+    const trimmed = cleanInput.trim().replace(/^["']+|["']+$/g, '');
     // Reject invalid paths that don't start with drive letter or /
     if (trimmed && (trimmed.match(/^[A-Za-z]:/) || trimmed.startsWith('/'))) {
       return [trimmed];
@@ -84,8 +87,8 @@ function parsePastedPaths(input) {
   const paths = [];
   for (let i = 0; i < pathStarts.length; i++) {
     const start = pathStarts[i];
-    const end = pathStarts[i + 1] || input.length;
-    let extractedPath = input.substring(start, end).trim();
+    const end = pathStarts[i + 1] || cleanInput.length;
+    let extractedPath = cleanInput.substring(start, end).trim();
     
     // Remove quotes from ends
     extractedPath = extractedPath.replace(/^["']+|["']+$/g, '');
