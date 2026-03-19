@@ -23,10 +23,14 @@ function parsePastedPaths(input) {
   let match;
   
   while ((match = quotedPattern.exec(input)) !== null) {
-    quotedMatches.push(match[1]);
+    const cleanPath = match[1].trim();
+    // Only add non-empty paths that have at least a drive letter or root
+    if (cleanPath && (cleanPath.match(/^[A-Za-z]:/) || cleanPath.startsWith('/'))) {
+      quotedMatches.push(cleanPath);
+    }
   }
   
-  // If we found quoted paths, return them
+  // If we found valid quoted paths, return them
   if (quotedMatches.length > 0) {
     return quotedMatches;
   }
@@ -49,7 +53,12 @@ function parsePastedPaths(input) {
   
   // If no multiple paths found, return as single path
   if (pathStarts.length <= 1) {
-    return [input.trim()];
+    const trimmed = input.trim();
+    // Reject invalid paths that don't start with drive letter or /
+    if (trimmed && (trimmed.match(/^[A-Za-z]:/) || trimmed.startsWith('/'))) {
+      return [trimmed];
+    }
+    return [];
   }
   
   // Sort positions
@@ -60,13 +69,14 @@ function parsePastedPaths(input) {
   for (let i = 0; i < pathStarts.length; i++) {
     const start = pathStarts[i];
     const end = pathStarts[i + 1] || input.length;
-    const path = input.substring(start, end).trim();
-    if (path) {
-      paths.push(path);
+    const extractedPath = input.substring(start, end).trim();
+    // Only add valid paths
+    if (extractedPath && (extractedPath.match(/^[A-Za-z]:/) || extractedPath.startsWith('/'))) {
+      paths.push(extractedPath);
     }
   }
   
-  return paths.length > 0 ? paths : [input.trim()];
+  return paths.length > 0 ? paths : [];
 }
 
 /**
@@ -117,6 +127,12 @@ async function promptForMultipleInputs() {
 
     // Parse multiple paths if user pasted them at once
     const pathsToProcess = parsePastedPaths(pathInput);
+
+    if (pathsToProcess.length === 0) {
+      console.error('❌ No valid paths detected. Make sure paths start with a drive letter (C:, D:, etc.) or / (Unix)');
+      console.error('   Input: ' + pathInput.substring(0, 80) + (pathInput.length > 80 ? '...' : ''));
+      continue;
+    }
 
     for (const singlePath of pathsToProcess) {
       // Remove surrounding quotes if present (handles: "path", 'path', or path)
