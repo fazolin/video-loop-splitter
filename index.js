@@ -106,8 +106,8 @@ async function interactiveSetup(options) {
   }
 
   // Output directory
-  if (!options.output || options.output === './output') {
-    const defaultOutput = path.join(options.input, 'output');
+  if (!options.output || options.output === './loops') {
+    const defaultOutput = path.join(options.input, 'loops');
     const customPath = await prompt('📁 Enter output directory path', defaultOutput);
     options.output = path.resolve(customPath);
   }
@@ -150,7 +150,7 @@ function parseArgs() {
   const args = process.argv.slice(2);
   const options = {
     input: null,
-    output: './output',
+    output: './loops',
     split: 0.5,
     workers: 2,
     dryRun: false,

@@ -53,14 +53,14 @@ sudo dnf install ffmpeg
 ```bash
 git clone https://github.com/your-username/video-loop-splitter.git
 cd video-loop-splitter
-node index.js --input ./videos --output ./output
+node index.js --input ./videos --output ./loops
 ```
 
 ### As a global CLI tool (via npm)
 
 ```bash
 npm install -g video-loop-splitter
-video-loop-splitter --input ./videos --output ./output
+video-loop-splitter --input ./videos --output ./loops
 ```
 
 ## Usage
@@ -68,7 +68,7 @@ video-loop-splitter --input ./videos --output ./output
 ### Basic Usage
 
 ```bash
-node index.js --input ./videos --output ./output
+node index.js --input ./videos --output ./loops
 ```
 
 ### All Options
@@ -76,7 +76,7 @@ node index.js --input ./videos --output ./output
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--input <dir>` | *(required)* | Input directory containing video files |
-| `--output <dir>` | `./output` | Output directory for processed videos |
+| `--output <dir>` | `./loops` | Output directory for processed videos |
 | `--split <ratio>` | `0.5` | Split ratio between 0.2 (20%) and 0.8 (80%) |
 | `--workers <num>` | `2` | Number of parallel worker threads |
 | `--dry-run` | `false` | Preview operations without processing |
@@ -89,32 +89,32 @@ node index.js --input ./videos --output ./output
 
 **Basic processing (default 50% split, 2 workers):**
 ```bash
-node index.js --input ./videos --output ./output
+node index.js --input ./videos --output ./loops
 ```
 
 **Custom split point and more workers:**
 ```bash
-node index.js --input ./videos --output ./output --split 0.4 --workers 4
+node index.js --input ./videos --output ./loops --split 0.4 --workers 4
 ```
 
 **Preview without processing:**
 ```bash
-node index.js --input ./videos --output ./output --dry-run
+node index.js --input ./videos --output ./loops --dry-run
 ```
 
 **Don't recurse into subdirectories:**
 ```bash
-node index.js --input ./videos --output ./output --no-recursive
+node index.js --input ./videos --output ./loops --no-recursive
 ```
 
 **Overwrite existing files:**
 ```bash
-node index.js --input ./videos --output ./output --overwrite
+node index.js --input ./videos --output ./loops --overwrite
 ```
 
 **Aggressive split (80% of video before dissolve):**
 ```bash
-node index.js --input ./videos --output ./output --split 0.8
+node index.js --input ./videos --output ./loops --split 0.8
 ```
 
 ## How It Works
@@ -202,7 +202,7 @@ $ node index.js --input ./videos --split 0.3 --dry-run
 ### Example 3: Parallel Processing with 4 Workers
 
 ```bash
-$ node index.js --input ./videos --output ./output --workers 4
+$ node index.js --input ./videos --output ./loops --workers 4
 
 # Processes 4 videos simultaneously for faster batch conversion
 ```
@@ -237,27 +237,58 @@ Output directory structure mirrors the input structure (with `--no-recursive` di
 
 ## Troubleshooting
 
-### Error: `ffmpeg not found`
-Ensure FFmpeg is installed and in your system PATH. Test with:
+### Error: `ffprobe` / `ffmpeg` not found
+On Windows you may see:
+> 'ffprobe' não é reconhecido como um comando interno ou externo
+
+This means FFmpeg is not installed or not on your PATH.
+
+**Windows (recommended)**
+```bash
+winget install --id Gyan.FFmpeg
+```
+Then close and re-open your terminal (or restart your shell), and verify:
 ```bash
 ffmpeg -version
 ffprobe -version
 ```
 
+**macOS**
+```bash
+brew install ffmpeg
+```
+
+**Linux (Debian/Ubuntu)**
+```bash
+sudo apt-get update && sudo apt-get install ffmpeg
+```
+
+### Error: `Error opening input file E:\ADA...` (spaces in path)
+If your input path contains spaces (common on Windows), old versions of the script may fail to quote the path correctly and FFmpeg will treat it as multiple arguments.
+
+✅ Solution: Update to the latest version (this repo already quotes paths) and rerun. If you are running a local copy, make sure you use the latest `index.js` and `lib/process.js`.
+
+### Output files won’t open / blank video
+If the generated MP4s open but show a black screen or fail in some players, it can be caused by **incompatible pixel formats or codec profiles**.
+
+✅ Fix included in this version:
+- Forces `-pix_fmt yuv420p` (widely supported)
+- Adds `-movflags +faststart` (better playback in players/streaming)
+
 ### Slow processing
-Increase worker count:
+Increase worker count (more CPU cores → faster processing):
 ```bash
 node index.js --input ./videos --workers 8
 ```
 
 ### Output files have visible seams
-This is normal for certain video content. Try different split ratios:
+Some content can still show a noticeable cut. Try a different split ratio:
 ```bash
-node index.js --input ./videos --split 0.4  # Instead of 0.5
+node index.js --input ./videos --split 0.4
 ```
 
 ### Audio sync issues
-Ensure your videos are properly encoded. Re-encode the source with FFmpeg first:
+If audio seems off, re-encode the source first:
 ```bash
 ffmpeg -i input.mp4 -c:v libx264 -preset medium output.mp4
 ```
