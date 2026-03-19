@@ -77,24 +77,6 @@ async function promptForMultipleInputs() {
 
   return inputs;
 }
-    }
-
-    const fullPath = path.resolve(pathInput);
-
-    if (isInput) {
-      if (!fs.existsSync(fullPath)) {
-        console.error(`❌ Directory does not exist: ${fullPath}`);
-        continue;
-      }
-      if (!fs.statSync(fullPath).isDirectory()) {
-        console.error(`❌ Path is not a directory: ${fullPath}`);
-        continue;
-      }
-    }
-
-    return fullPath;
-  }
-}
 
 /**
  * Prompt user for numeric option
@@ -264,6 +246,37 @@ function validateOptions(options, isInteractive = false) {
     console.error('Error: --workers must be at least 1');
     process.exit(1);
   }
+}
+
+/**
+ * Find all video files in input directory
+ */
+function findVideoFiles(dirPath, recursive = true) {
+  const videos = [];
+
+  function scan(dir) {
+    try {
+      const items = fs.readdirSync(dir);
+      for (const item of items) {
+        const fullPath = path.join(dir, item);
+        const stat = fs.statSync(fullPath);
+
+        if (stat.isDirectory() && recursive) {
+          scan(fullPath);
+        } else if (stat.isFile()) {
+          const ext = path.extname(item).toLowerCase();
+          if (SUPPORTED_EXTENSIONS.includes(ext)) {
+            videos.push(fullPath);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`Warning: Failed to scan directory ${dir}: ${error.message}`);
+    }
+  }
+
+  scan(dirPath);
+  return videos;
 }
 
 /**
