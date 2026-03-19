@@ -269,6 +269,19 @@ Output directory structure mirrors the input structure (with `--no-recursive` di
 
 ## Troubleshooting
 
+### Error: `Path does not exist` in interactive mode
+If you're entering paths with spaces in interactive mode, don't add quotes around the path. The tool handles spaces automatically.
+
+❌ Wrong:
+```
+Path: "C:\My Folder\video.mp4"
+```
+
+✅ Correct:
+```
+Path: C:\My Folder\video.mp4
+```
+
 ### Error: `ffprobe` / `ffmpeg` not found
 On Windows you may see:
 > 'ffprobe' não é reconhecido como um comando interno ou externo
