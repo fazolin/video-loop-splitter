@@ -9,6 +9,54 @@ const Queue = require('./lib/queue');
 const SUPPORTED_EXTENSIONS = ['.mp4', '.mov', '.mkv', '.avi', '.webm'];
 
 /**
+ * Parse multiple paths pasted as one line (Windows "Paste as One Line" feature)
+ * Detects Windows paths (C:\...) and Unix paths (/...)
+ * Handles paths with spaces correctly
+ * @param {string} input - The pasted paths string
+ * @returns {string[]} - Array of individual paths
+ */
+function parsePastedPaths(input) {
+  // Find all starting positions of paths (Windows drives or Unix paths)
+  const pathStarts = [];
+  
+  // Look for Windows drive letters (C:, D:, etc.)
+  const drivePattern = /[A-Za-z]:/g;
+  let match;
+  
+  while ((match = drivePattern.exec(input)) !== null) {
+    pathStarts.push(match.index);
+  }
+  
+  // Look for Unix absolute paths (starting with /)
+  const unixPattern = /(?:^|\s)\/[^\s]/g;
+  while ((match = unixPattern.exec(input)) !== null) {
+    // Add position right before the / if preceded by space
+    pathStarts.push(match.index + (match[0].startsWith('/') ? 0 : 1));
+  }
+  
+  // If no multiple paths found, return as single path
+  if (pathStarts.length <= 1) {
+    return [input.trim()];
+  }
+  
+  // Sort positions
+  pathStarts.sort((a, b) => a - b);
+  
+  // Extract individual paths
+  const paths = [];
+  for (let i = 0; i < pathStarts.length; i++) {
+    const start = pathStarts[i];
+    const end = pathStarts[i + 1] || input.length;
+    const path = input.substring(start, end).trim();
+    if (path) {
+      paths.push(path);
+    }
+  }
+  
+  return paths.length > 0 ? paths : [input.trim()];
+}
+
+/**
  * Create readline interface for user input
  */
 function createReadlineInterface() {
@@ -35,11 +83,13 @@ function prompt(question, defaultValue = null) {
 
 /**
  * Prompt user for multiple input paths (files or directories)
+ * Supports single path per prompt OR multiple paths pasted at once (Windows "Paste as One Line")
  * Returns array of {type: 'file'|'dir', path: string}
  */
 async function promptForMultipleInputs() {
   const inputs = [];
   console.log('\n📁 Enter input paths (files or directories). Leave blank when done:');
+  console.log('💡 Tip: You can paste multiple paths at once (via "Paste as One Line")\n');
 
   while (true) {
     const pathInput = await prompt('Path');
@@ -52,28 +102,35 @@ async function promptForMultipleInputs() {
       break;
     }
 
-    // Remove surrounding quotes if present
-    const trimmedPath = pathInput.replace(/^["']|["']$/g, '');
-    const fullPath = path.resolve(trimmedPath);
+    // Parse multiple paths if user pasted them at once
+    const pathsToProcess = parsePastedPaths(pathInput);
 
-    if (!fs.existsSync(fullPath)) {
-      console.error(`❌ Path does not exist: ${fullPath}`);
-      continue;
-    }
+    for (const singlePath of pathsToProcess) {
+      // Remove surrounding quotes if present
+      const trimmedPath = singlePath.replace(/^["']|["']$/g, '');
+      const fullPath = path.resolve(trimmedPath);
 
-    const stat = fs.statSync(fullPath);
-    if (stat.isFile()) {
-      const ext = path.extname(fullPath).toLowerCase();
-      if (!SUPPORTED_EXTENSIONS.includes(ext)) {
-        console.error(`❌ Unsupported file type: ${ext}`);
+      if (!fs.existsSync(fullPath)) {
+        console.error(`❌ Path does not exist: ${fullPath}`);
         continue;
       }
-      inputs.push({ type: 'file', path: fullPath });
-    } else if (stat.isDirectory()) {
-      inputs.push({ type: 'dir', path: fullPath });
-    } else {
-      console.error(`❌ Path is neither a file nor a directory: ${fullPath}`);
-      continue;
+
+      const stat = fs.statSync(fullPath);
+      if (stat.isFile()) {
+        const ext = path.extname(fullPath).toLowerCase();
+        if (!SUPPORTED_EXTENSIONS.includes(ext)) {
+          console.error(`❌ Unsupported file type: ${ext}`);
+          continue;
+        }
+        inputs.push({ type: 'file', path: fullPath });
+        console.log(`✅ Added: ${fullPath}`);
+      } else if (stat.isDirectory()) {
+        inputs.push({ type: 'dir', path: fullPath });
+        console.log(`✅ Added: ${fullPath}`);
+      } else {
+        console.error(`❌ Path is neither a file nor a directory: ${fullPath}`);
+        continue;
+      }
     }
   }
 
