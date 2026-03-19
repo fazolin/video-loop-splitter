@@ -52,7 +52,9 @@ async function promptForMultipleInputs() {
       break;
     }
 
-    const fullPath = path.resolve(pathInput);
+    // Remove surrounding quotes if present
+    const trimmedPath = pathInput.replace(/^["']|["']$/g, '');
+    const fullPath = path.resolve(trimmedPath);
 
     if (!fs.existsSync(fullPath)) {
       console.error(`❌ Path does not exist: ${fullPath}`);
