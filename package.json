@@ -1,0 +1,37 @@
+{
+  "name": "video-loop-splitter",
+  "version": "1.0.0",
+  "description": "CLI tool to create seamless looping videos using ffmpeg — splits a video in two, swaps the halves, and adds a dissolve transition",
+  "main": "index.js",
+  "bin": {
+    "video-loop-splitter": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js --help",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ffmpeg",
+    "video",
+    "cli",
+    "nodejs",
+    "loop",
+    "seamless-loop",
+    "windows",
+    "macos",
+    "linux"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/video-loop-splitter.git"
+  },
+  "homepage": "https://github.com/your-username/video-loop-splitter",
+  "bugs": {
+    "url": "https://github.com/your-username/video-loop-splitter/issues"
+  }
+}
