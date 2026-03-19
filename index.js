@@ -11,17 +11,31 @@ const SUPPORTED_EXTENSIONS = ['.mp4', '.mov', '.mkv', '.avi', '.webm'];
 /**
  * Parse multiple paths pasted as one line (Windows "Paste as One Line" feature)
  * Detects Windows paths (C:\...) and Unix paths (/...)
- * Handles paths with spaces correctly
+ * Handles paths with spaces and quotes correctly
  * @param {string} input - The pasted paths string
  * @returns {string[]} - Array of individual paths
  */
 function parsePastedPaths(input) {
-  // Find all starting positions of paths (Windows drives or Unix paths)
+  // First, try to split by quoted paths (most common from Windows Explorer)
+  // Pattern: "C:\path\to\file" or "D:\path with spaces"
+  const quotedPattern = /"([^"]+)"/g;
+  const quotedMatches = [];
+  let match;
+  
+  while ((match = quotedPattern.exec(input)) !== null) {
+    quotedMatches.push(match[1]);
+  }
+  
+  // If we found quoted paths, return them
+  if (quotedMatches.length > 0) {
+    return quotedMatches;
+  }
+  
+  // Fallback: find paths by drive letters if not quoted
   const pathStarts = [];
   
   // Look for Windows drive letters (C:, D:, etc.)
   const drivePattern = /[A-Za-z]:/g;
-  let match;
   
   while ((match = drivePattern.exec(input)) !== null) {
     pathStarts.push(match.index);
@@ -30,7 +44,6 @@ function parsePastedPaths(input) {
   // Look for Unix absolute paths (starting with /)
   const unixPattern = /(?:^|\s)\/[^\s]/g;
   while ((match = unixPattern.exec(input)) !== null) {
-    // Add position right before the / if preceded by space
     pathStarts.push(match.index + (match[0].startsWith('/') ? 0 : 1));
   }
   
@@ -106,8 +119,9 @@ async function promptForMultipleInputs() {
     const pathsToProcess = parsePastedPaths(pathInput);
 
     for (const singlePath of pathsToProcess) {
-      // Remove surrounding quotes if present
-      const trimmedPath = singlePath.replace(/^["']|["']$/g, '');
+      // Remove surrounding quotes if present (handles: "path", 'path', or path)
+      let trimmedPath = singlePath.trim();
+      trimmedPath = trimmedPath.replace(/^["']+|["']+$/g, '');
       const fullPath = path.resolve(trimmedPath);
 
       if (!fs.existsSync(fullPath)) {
