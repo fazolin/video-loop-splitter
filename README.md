@@ -121,6 +121,17 @@ node index.js --input ./videos --output ./loops
 node index.js --input video1.mp4 --input video2.mp4 --input ./batch1
 ```
 
+**Interactive mode (easiest for multiple inputs):**
+```bash
+node index.js
+```
+Then follow the prompts. In interactive mode, you can:
+- Enter paths one by one
+- **Paste multiple paths at once** using Windows **"Paste as One Line"** feature
+  - Select multiple folders in Explorer → Right-click → Copy
+  - In the prompt, right-click → **Paste as One Line**
+  - The tool will automatically split and add all paths
+
 **Custom split point and more workers:**
 ```bash
 node index.js --input ./videos --output ./loops --split 0.4 --workers 4
@@ -145,6 +156,28 @@ node index.js --input ./videos --output ./loops --overwrite
 ```bash
 node index.js --input ./videos --output ./loops --split 0.8
 ```
+
+## Interactive Mode (Recommended for Multiple Inputs)
+
+**Start interactive mode:**
+```bash
+node index.js
+```
+
+The tool will guide you through the setup with prompts. The best feature: **you can paste multiple paths at once!**
+
+### Using "Paste as One Line" (Windows Feature)
+
+1. Open Windows Explorer
+2. Select multiple folders or files that contain videos
+3. Right-click → **Copy**
+4. In the tool prompt, right-click → **Paste as One Line** (or `Shift+Insert`)
+5. The tool automatically splits and validates each path
+
+✅ Works with:
+- Multiple folders on different drives (C:\..., D:\)
+- Paths with spaces ("My Videos", etc.)
+- Mixed input (files and folders)
 
 ## How It Works
 
