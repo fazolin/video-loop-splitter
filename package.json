@@ -21,17 +21,17 @@
     "macos",
     "linux"
   ],
-  "author": "Your Name",
+  "author": "fazolin",
   "license": "MIT",
   "engines": {
     "node": ">=18"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/video-loop-splitter.git"
+    "url": "https://github.com/fazolin/video-loop-splitter.git"
   },
-  "homepage": "https://github.com/your-username/video-loop-splitter",
+  "homepage": "https://github.com/fazolin/video-loop-splitter",
   "bugs": {
-    "url": "https://github.com/your-username/video-loop-splitter/issues"
+    "url": "https://github.com/fazolin/video-loop-splitter/issues"
   }
 }
