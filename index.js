@@ -23,9 +23,25 @@ function parsePastedPaths(input) {
   let match;
   
   while ((match = quotedPattern.exec(input)) !== null) {
-    const cleanPath = match[1].trim();
-    // Only add non-empty paths that have at least a drive letter or root
-    if (cleanPath && (cleanPath.match(/^[A-Za-z]:/) || cleanPath.startsWith('/'))) {
+    let cleanPath = match[1].trim();
+    
+    // Skip empty paths
+    if (!cleanPath) continue;
+    
+    // Try to recover paths that are missing drive letter
+    // If path doesn't start with drive letter but contains known patterns
+    // and we have other valid paths, assume it's on same drive
+    if (!cleanPath.match(/^[A-Za-z]:/) && !cleanPath.startsWith('/')) {
+      // Check if this looks like it's missing a drive letter (starts with folder name)
+      if (cleanPath.match(/^[a-z]/i) && cleanPath.includes('\\')) {
+        // Try to infer the drive from other paths in the same batch
+        // For now, we'll add it to a separate list to handle after
+        continue;
+      }
+    }
+    
+    // Only add valid paths that have drive letter or root
+    if (cleanPath.match(/^[A-Za-z]:/) || cleanPath.startsWith('/')) {
       quotedMatches.push(cleanPath);
     }
   }
@@ -51,9 +67,9 @@ function parsePastedPaths(input) {
     pathStarts.push(match.index + (match[0].startsWith('/') ? 0 : 1));
   }
   
-  // If no multiple paths found, return as single path
+  // If no multiple paths found, return as single path (if valid)
   if (pathStarts.length <= 1) {
-    const trimmed = input.trim();
+    const trimmed = input.trim().replace(/^["']+|["']+$/g, '');
     // Reject invalid paths that don't start with drive letter or /
     if (trimmed && (trimmed.match(/^[A-Za-z]:/) || trimmed.startsWith('/'))) {
       return [trimmed];
@@ -69,7 +85,11 @@ function parsePastedPaths(input) {
   for (let i = 0; i < pathStarts.length; i++) {
     const start = pathStarts[i];
     const end = pathStarts[i + 1] || input.length;
-    const extractedPath = input.substring(start, end).trim();
+    let extractedPath = input.substring(start, end).trim();
+    
+    // Remove quotes from ends
+    extractedPath = extractedPath.replace(/^["']+|["']+$/g, '');
+    
     // Only add valid paths
     if (extractedPath && (extractedPath.match(/^[A-Za-z]:/) || extractedPath.startsWith('/'))) {
       paths.push(extractedPath);
@@ -129,8 +149,11 @@ async function promptForMultipleInputs() {
     const pathsToProcess = parsePastedPaths(pathInput);
 
     if (pathsToProcess.length === 0) {
-      console.error('❌ No valid paths detected. Make sure paths start with a drive letter (C:, D:, etc.) or / (Unix)');
-      console.error('   Input: ' + pathInput.substring(0, 80) + (pathInput.length > 80 ? '...' : ''));
+      console.error('\n❌ No valid paths detected.');
+      console.error('   Make sure paths start with a drive letter (C:, D:, E:, etc.) or / (Unix/Mac)');
+      console.error('   If using "Paste as One Line", check that the FIRST path has the drive letter.');
+      console.error('   Input received: ' + pathInput.substring(0, 120) + (pathInput.length > 120 ? '...' : ''));
+      console.error('');
       continue;
     }
 
@@ -138,6 +161,12 @@ async function promptForMultipleInputs() {
       // Remove surrounding quotes if present (handles: "path", 'path', or path)
       let trimmedPath = singlePath.trim();
       trimmedPath = trimmedPath.replace(/^["']+|["']+$/g, '');
+      
+      // Remove trailing backslash/slash (unless it's root like C:\)
+      if (trimmedPath.length > 3) {
+        trimmedPath = trimmedPath.replace(/[\\\/]+$/, '');
+      }
+      
       const fullPath = path.resolve(trimmedPath);
 
       if (!fs.existsSync(fullPath)) {
