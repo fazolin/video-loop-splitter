@@ -34,20 +34,49 @@ function prompt(question, defaultValue = null) {
 }
 
 /**
- * Prompt user for path with validation
+ * Prompt user for multiple input paths (files or directories)
+ * Returns array of {type: 'file'|'dir', path: string}
  */
-async function promptForPath(pathType = 'input') {
-  const isInput = pathType === 'input';
-  const question = isInput
-    ? '📁 Enter input directory path (containing videos)'
-    : '📁 Enter output directory path';
+async function promptForMultipleInputs() {
+  const inputs = [];
+  console.log('\n📁 Enter input paths (files or directories). Leave blank when done:');
 
   while (true) {
-    const pathInput = await prompt(question);
+    const pathInput = await prompt('Path');
 
     if (!pathInput) {
-      console.error('❌ Path cannot be empty');
+      if (inputs.length === 0) {
+        console.error('❌ At least one input path is required');
+        continue;
+      }
+      break;
+    }
+
+    const fullPath = path.resolve(pathInput);
+
+    if (!fs.existsSync(fullPath)) {
+      console.error(`❌ Path does not exist: ${fullPath}`);
       continue;
+    }
+
+    const stat = fs.statSync(fullPath);
+    if (stat.isFile()) {
+      const ext = path.extname(fullPath).toLowerCase();
+      if (!SUPPORTED_EXTENSIONS.includes(ext)) {
+        console.error(`❌ Unsupported file type: ${ext}`);
+        continue;
+      }
+      inputs.push({ type: 'file', path: fullPath });
+    } else if (stat.isDirectory()) {
+      inputs.push({ type: 'dir', path: fullPath });
+    } else {
+      console.error(`❌ Path is neither a file nor a directory: ${fullPath}`);
+      continue;
+    }
+  }
+
+  return inputs;
+}
     }
 
     const fullPath = path.resolve(pathInput);
@@ -100,16 +129,20 @@ async function promptForNumber(question, defaultValue, min = null, max = null) {
 async function interactiveSetup(options) {
   console.log('\n🎬 video-loop-splitter — Interactive Setup\n');
 
-  // Input directory
-  if (!options.input) {
-    options.input = await promptForPath('input');
+  // Input paths (multiple)
+  if (!options.inputs || options.inputs.length === 0) {
+    const inputPaths = await promptForMultipleInputs();
+    options.inputs = inputPaths.map(item => item.path);
   }
 
-  // Output directory
+  // Output directory (optional, for directories)
   if (!options.output || options.output === './loops') {
-    const defaultOutput = path.join(options.input, 'loops');
-    const customPath = await prompt('📁 Enter output directory path', defaultOutput);
-    options.output = path.resolve(customPath);
+    const outputInput = await prompt('📁 Enter output directory path (optional, press Enter for auto)', '');
+    if (outputInput) {
+      options.output = path.resolve(outputInput);
+    } else {
+      options.output = null; // auto
+    }
   }
 
   // Split ratio
@@ -149,7 +182,7 @@ async function interactiveSetup(options) {
 function parseArgs() {
   const args = process.argv.slice(2);
   const options = {
-    input: null,
+    inputs: [],
     output: './loops',
     split: 0.5,
     workers: 2,
@@ -161,7 +194,7 @@ function parseArgs() {
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
       case '--input':
-        options.input = args[++i];
+        options.inputs.push(args[++i]);
         break;
       case '--output':
         options.output = args[++i];
@@ -234,34 +267,45 @@ function validateOptions(options, isInteractive = false) {
 }
 
 /**
- * Find all video files in input directory
+ * Collect all video processing tasks from inputs
  */
-function findVideoFiles(dirPath, recursive = true) {
-  const videos = [];
+function collectTasks(inputs, globalOutput, recursive = true) {
+  const tasks = [];
 
-  function scan(dir) {
-    try {
-      const items = fs.readdirSync(dir);
-      for (const item of items) {
-        const fullPath = path.join(dir, item);
-        const stat = fs.statSync(fullPath);
+  for (const inputPath of inputs) {
+    if (!fs.existsSync(inputPath)) {
+      console.warn(`Warning: Input path does not exist: ${inputPath}`);
+      continue;
+    }
 
-        if (stat.isDirectory() && recursive) {
-          scan(fullPath);
-        } else if (stat.isFile()) {
-          const ext = path.extname(item).toLowerCase();
-          if (SUPPORTED_EXTENSIONS.includes(ext)) {
-            videos.push(fullPath);
-          }
-        }
+    const stat = fs.statSync(inputPath);
+    if (stat.isFile()) {
+      // Single file
+      const ext = path.extname(inputPath).toLowerCase();
+      if (!SUPPORTED_EXTENSIONS.includes(ext)) {
+        console.warn(`Warning: Unsupported file type: ${inputPath}`);
+        continue;
       }
-    } catch (error) {
-      console.warn(`Warning: Failed to scan directory ${dir}: ${error.message}`);
+      const outputDir = path.join(path.dirname(inputPath), 'loops');
+      const baseName = path.basename(inputPath, ext);
+      const outputPath = path.join(outputDir, `${baseName}_loop${ext}`);
+      tasks.push({ inputPath, outputPath });
+    } else if (stat.isDirectory()) {
+      // Directory
+      const outputDir = globalOutput || path.join(inputPath, 'loops');
+      const videoFiles = findVideoFiles(inputPath, recursive);
+      for (const videoFile of videoFiles) {
+        const relativePath = path.relative(inputPath, videoFile);
+        const baseName = path.basename(videoFile, path.extname(videoFile));
+        const ext = path.extname(videoFile);
+        const outputFileName = `${baseName}_loop${ext}`;
+        const outputPath = path.join(outputDir, outputFileName);
+        tasks.push({ inputPath: videoFile, outputPath });
+      }
     }
   }
 
-  scan(dirPath);
-  return videos;
+  return tasks;
 }
 
 /**
@@ -276,8 +320,8 @@ Usage:
   node index.js --input <dir> --output <dir> [options]
 
 Options:
-  --input <dir>           Input directory containing videos
-  --output <dir>          Output directory for processed videos (default: ./output)
+  --input <path>          Input file or directory (can be used multiple times)
+  --output <dir>          Output directory (optional, auto for files)
   --split <ratio>         Split ratio between 0.2 and 0.8 (default: 0.5)
   --workers <num>         Number of parallel workers (default: 2)
   --dry-run               Show what would be done without processing
@@ -288,9 +332,9 @@ Options:
 
 Examples:
   node index.js                           (run in interactive mode)
-  node index.js --input ./videos --output ./output
-  node index.js --input ./videos --output ./output --split 0.4 --workers 4
-  node index.js --input ./videos --output ./output --dry-run
+  node index.js --input ./videos --output ./loops
+  node index.js --input video.mp4 --input ./videos --split 0.4 --workers 4
+  node index.js --input ./videos --dry-run
   `);
 }
 
@@ -311,32 +355,30 @@ function formatSize(bytes) {
 async function main() {
   const options = parseArgs();
 
-  // If no input provided, use interactive mode
-  if (!options.input) {
+  // If no inputs provided, use interactive mode
+  if (!options.inputs || options.inputs.length === 0) {
     await interactiveSetup(options);
   } else {
-    validateOptions(options, false);
-  }
-
-  // Final validation
-  if (!fs.existsSync(options.input)) {
-    console.error(`❌ Input directory does not exist: ${options.input}`);
-    process.exit(1);
+    validateOptions(options, true);
   }
 
   console.log('🎬 video-loop-splitter v1.0.0\n');
 
-  const videoFiles = findVideoFiles(options.input, options.recursive);
+  const tasks = collectTasks(options.inputs, options.output, options.recursive);
 
-  if (videoFiles.length === 0) {
-    console.log('No video files found in the input directory.');
+  if (tasks.length === 0) {
+    console.log('No video files found in the input paths.');
     process.exit(0);
   }
 
-  console.log(`Found ${videoFiles.length} video file(s)\n`);
+  console.log(`Found ${tasks.length} video file(s)\n`);
   console.log('Options:');
-  console.log(`  Input:     ${options.input}`);
-  console.log(`  Output:    ${options.output}`);
+  console.log(`  Inputs:    ${options.inputs.join(', ')}`);
+  if (options.output) {
+    console.log(`  Output:    ${options.output}`);
+  } else {
+    console.log(`  Output:    auto (loops folder next to each file)`);
+  }
   console.log(`  Split:     ${(options.split * 100).toFixed(0)}%`);
   console.log(`  Workers:   ${options.workers}`);
   console.log(`  Mode:      ${options.dryRun ? 'DRY RUN' : 'PROCESSING'}`);
@@ -346,17 +388,14 @@ async function main() {
   const startTime = Date.now();
   const results = [];
 
-  for (const videoFile of videoFiles) {
+  for (const task of tasks) {
     queue.add(async () => {
-      const relativePath = path.relative(options.input, videoFile);
-      const baseName = path.basename(videoFile, path.extname(videoFile));
-      const ext = path.extname(videoFile);
-      const outputFileName = `${baseName}_loop${ext}`;
-      const outputPath = path.join(options.output, outputFileName);
+      const { inputPath, outputPath } = task;
+      const fileName = path.basename(inputPath);
 
       try {
         const result = await processVideo({
-          inputPath: videoFile,
+          inputPath,
           outputPath,
           splitRatio: options.split,
           dryRun: options.dryRun,
@@ -366,25 +405,25 @@ async function main() {
         results.push(result);
 
         if (result.status === 'error') {
-          console.log(`❌ ${relativePath}`);
+          console.log(`❌ ${fileName}`);
           console.log(`   Error: ${result.error}`);
         } else if (result.status === 'skipped') {
-          console.log(`⏭️  ${relativePath}`);
+          console.log(`⏭️  ${fileName}`);
           console.log(`   Skipped: ${result.reason}`);
         } else if (result.status === 'dry-run') {
-          console.log(`🔍 ${relativePath} (DRY RUN)`);
+          console.log(`🔍 ${fileName} (DRY RUN)`);
           console.log(`   Duration: ${result.duration}s | Split: ${result.splitPoint}s | Dissolve: ${result.dissolveDuration}s | Audio: ${result.hasAudio ? 'yes' : 'no'}`);
         } else {
-          console.log(`✅ ${relativePath}`);
+          console.log(`✅ ${fileName}`);
           console.log(`   Duration: ${result.duration}s | Split: ${result.splitPoint}s | Dissolve: ${result.dissolveDuration}s | Audio: ${result.hasAudio ? 'yes' : 'no'}`);
         }
       } catch (error) {
         results.push({
           status: 'error',
-          file: path.basename(videoFile),
+          file: fileName,
           error: error.message,
         });
-        console.log(`❌ ${relativePath}`);
+        console.log(`❌ ${fileName}`);
         console.log(`   Error: ${error.message}`);
       }
     });
